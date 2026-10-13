@@ -21,7 +21,7 @@ import torch
 from torch.profiler import record_function
 from vllm.config import LoadConfig, VllmConfig
 from vllm.logger import init_logger
-from vllm.utils.mem_utils import DeviceMemoryProfiler, GiB_bytes
+from vllm.utils.mem_utils import DeviceMemoryProfiler, GiB_bytes, format_gib
 from vllm.v1.kv_cache_interface import KVCacheConfig, KVCacheSpec
 
 from vllm_omni.diffusion.attention.layer import Attention
@@ -630,17 +630,16 @@ class DiffusionModelRunner(DiffusionStagePayloadMixin):
         peak_reserved_bytes = current_omni_platform.max_memory_reserved()
         peak_allocated_bytes = current_omni_platform.max_memory_allocated()
 
+        pool_overhead_bytes = peak_reserved_bytes - peak_allocated_bytes
+
         peak_memory_mb = peak_reserved_bytes / (1024**2)
-        peak_reserved_gib = peak_reserved_bytes / (1024**3)
-        peak_allocated_gib = peak_allocated_bytes / (1024**3)
-        pool_overhead_gib = peak_reserved_gib - peak_allocated_gib
 
         logger.debug(
-            "Peak GPU memory (this request): %.2f GiB reserved, %.2f GiB allocated, %.2f GiB pool overhead (%.1f%%)",
-            peak_reserved_gib,
-            peak_allocated_gib,
-            pool_overhead_gib,
-            pool_overhead_gib / peak_reserved_gib * 100 if peak_reserved_gib > 0 else 0.0,
+            "Peak GPU memory (this request): %s GiB reserved, %s GiB allocated, %s GiB pool overhead (%.1f%%)",
+            format_gib(peak_reserved_bytes),
+            format_gib(peak_allocated_bytes),
+            format_gib(pool_overhead_bytes),
+            pool_overhead_bytes / peak_reserved_bytes * 100 if peak_reserved_bytes > 0 else 0.0,
         )
         return peak_memory_mb
 
