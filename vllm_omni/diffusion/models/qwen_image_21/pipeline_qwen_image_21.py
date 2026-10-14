@@ -372,7 +372,10 @@ class QwenImage21Pipeline(
                 subfolder="text_encoder",
                 prefetch_list=qwen_subfolders,
                 local_files_only=local_files_only,
-            ).to(self.device)
+            )
+            # Prompt embeddings come from hidden states; drop the unused LM head before moving to GPU.
+            del self.text_encoder.lm_head
+            self.text_encoder = self.text_encoder.to(self.device)
         else:
             # Quantized path: build the HF model on meta, swap its nn.Linear
             # modules for vLLM quantizable linears, and stream the weights
@@ -667,7 +670,7 @@ class QwenImage21Pipeline(
         text_model = getattr(self.text_encoder.model, "language_model", self.text_encoder.model)
         handle = text_model.norm.register_forward_hook(lambda module, args, output: args[0])
         try:
-            outputs = self.text_encoder(**forward_kwargs)
+            outputs = self.text_encoder.model(**forward_kwargs)
         finally:
             handle.remove()
         hidden_states = outputs.hidden_states[-1]
