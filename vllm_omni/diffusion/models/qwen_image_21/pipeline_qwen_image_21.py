@@ -374,7 +374,8 @@ class QwenImage21Pipeline(
                 local_files_only=local_files_only,
             )
             # Prompt embeddings come from hidden states; drop the unused LM head before moving to GPU.
-            del self.text_encoder.lm_head
+            # Identity keeps the full forward (and any offload hook on it) without computing logits.
+            self.text_encoder.lm_head = nn.Identity()
             self.text_encoder = self.text_encoder.to(self.device)
         else:
             # Quantized path: build the HF model on meta, swap its nn.Linear
@@ -670,7 +671,7 @@ class QwenImage21Pipeline(
         text_model = getattr(self.text_encoder.model, "language_model", self.text_encoder.model)
         handle = text_model.norm.register_forward_hook(lambda module, args, output: args[0])
         try:
-            outputs = self.text_encoder.model(**forward_kwargs)
+            outputs = self.text_encoder(**forward_kwargs)
         finally:
             handle.remove()
         hidden_states = outputs.hidden_states[-1]
